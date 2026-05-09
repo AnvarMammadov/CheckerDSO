@@ -7,8 +7,8 @@
         xmlns:vm="clr-namespace:CheckerDSO.ViewModels"
         xmlns:conv="clr-namespace:CheckerDSO.Converters"
         mc:Ignorable="d"
-        Title="DSO Account Checker" Height="600" Width="900"
-        Background="{StaticResource WindowBackgroundBrush}"
+        Title="DSO Account Checker" Height="700" Width="1000"
+        Background="{StaticResource WindowBgBrush}"
         WindowStartupLocation="CenterScreen">
     
     <Window.DataContext>
@@ -18,17 +18,41 @@
     <Window.Resources>
         <conv:StatusToColorConverter x:Key="StatusColorConverter"/>
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+        
+        <!-- CARD STYLE FOR PANELS -->
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderBrush" Value="#252525"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.3" ShadowDepth="2"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="10">
+    <Grid Margin="15">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main Content -->
+            <RowDefinition Height="Auto"/> <!-- Footer Status -->
         </Grid.RowDefinitions>
 
-        <!-- Top Control Panel -->
-        <Border Grid.Row="0" Background="{StaticResource PanelBackgroundBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+        <!-- HEADER -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15" VerticalAlignment="Center">
+            <Path Data="{StaticResource Icon_Shield}" Fill="{StaticResource PrimaryBrush}" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
+            <TextBlock Text="DSO" FontWeight="Bold" FontSize="22" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text=" Account Checker" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+            <Border Background="#252525" CornerRadius="4" Padding="5,2" Margin="10,0,0,0">
+                <TextBlock Text="v1.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+            </Border>
+        </StackPanel>
+
+        <!-- TOOLBAR -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10" Margin="0,0,0,15">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -36,95 +60,161 @@
                 </Grid.ColumnDefinitions>
                 
                 <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="Load Logs" Command="{Binding LoadLogsCommand}"/>
-                    <Button Content="Load Proxies" Command="{Binding LoadProxiesCommand}"/>
-                    <Button Content="START" Command="{Binding StartCommand}" Background="#a6e3a1"/>
-                    <Button Content="STOP" Command="{Binding StopCommand}" Background="#f38ba8"/>
-                    <Button Content="Export Unverified" Command="{Binding ExportUnverifiedCommand}" Background="#f9e2af" Foreground="#181825"/>
+                    <!-- Load Logs -->
+                    <Button Command="{Binding LoadLogsCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Folder}" Fill="{StaticResource TextBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <TextBlock Text="Load Logs" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                    
+                    <!-- Load Proxies -->
+                    <Button Command="{Binding LoadProxiesCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Globe}" Fill="{StaticResource TextBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <TextBlock Text="Load Proxies" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Start -->
+                    <Button Command="{Binding StartCommand}" Style="{StaticResource SuccessButtonStyle}" Margin="15,4,4,4">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Play}" Fill="{StaticResource WindowBgBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,6,0"/>
+                            <TextBlock Text="START" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Stop -->
+                    <Button Command="{Binding StopCommand}" Style="{StaticResource ErrorButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Stop}" Fill="{StaticResource WindowBgBrush}" Width="12" Height="12" Stretch="Uniform" Margin="0,0,6,0"/>
+                            <TextBlock Text="STOP" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Export Unverified -->
+                    <Button Command="{Binding ExportUnverifiedCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="15,4,4,4">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Export}" Fill="{StaticResource WindowBgBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <TextBlock Text="Export Unverified" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Button>
                 </WrapPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Threads: " Margin="0,0,5,0" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding ThreadCount}" Width="20"/>
-                    <Slider Minimum="1" Maximum="50" Value="{Binding ThreadCount}" Width="100" Margin="5,0,0,0" IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
+                <!-- Thread Slider -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,5,0">
+                    <Path Data="{StaticResource Icon_Search}" Fill="{StaticResource TextMutedBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,5,0"/>
+                    <TextBlock Text="Threads:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,5,0" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding ThreadCount}" Width="20" FontWeight="Bold"/>
+                    <Slider Minimum="1" Maximum="50" Value="{Binding ThreadCount}" Width="100" Margin="5,0,0,0" 
+                            IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Content (DataGrid + Stats) -->
-        <Grid Grid.Row="1">
+        <!-- MAIN CONTENT (DataGrid + Stats) -->
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="1*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- DataGrid -->
-            <DataGrid Grid.Column="0" ItemsSource="{Binding Accounts}" AutoGenerateColumns="False" 
-                      CanUserAddRows="False" IsReadOnly="True" Background="{StaticResource PanelBackgroundBrush}"
-                      BorderThickness="0" RowBackground="#1e1e2e" AlternatingRowBackground="#181825"
-                      Foreground="{StaticResource TextBrush}" GridLinesVisibility="None" HeadersVisibility="Column"
-                      Margin="0,0,10,0">
-                <DataGrid.Resources>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="#11111b"/>
-                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                        <Setter Property="Padding" Value="10,5"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                    </Style>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="Foreground" Value="{Binding Status, Converter={StaticResource StatusColorConverter}}"/>
-                    </Style>
-                </DataGrid.Resources>
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="1.5*"/>
-                    <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="1*"/>
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="1*"/>
-                    <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="2*"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <!-- DataGrid Wrapper -->
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,15,0" Padding="1">
+                <DataGrid ItemsSource="{Binding Accounts}" AutoGenerateColumns="False" 
+                          CanUserAddRows="False" IsReadOnly="True" 
+                          BorderThickness="0" Background="Transparent"
+                          VirtualizingStackPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="1.5*"/>
+                        <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="1*"/>
+                        <DataGridTemplateColumn Header="Status" Width="1*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="#151515" CornerRadius="4" Padding="8,4" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" 
+                                                   Foreground="{Binding Status, Converter={StaticResource StatusColorConverter}}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="2*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
 
-            <!-- Stats Panel -->
-            <Border Grid.Column="1" Background="{StaticResource PanelBackgroundBrush}" CornerRadius="8" Padding="15">
+            <!-- Stats Dashboard -->
+            <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="20">
                 <StackPanel>
-                    <TextBlock Text="STATISTICS" FontWeight="Bold" FontSize="16" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                    <TextBlock Text="DASHBOARD" FontWeight="Bold" FontSize="16" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,20"/>
                     
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Total Loaded:" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalCount}" HorizontalAlignment="Right" FontWeight="Bold"/>
-                    </Grid>
-                    <Separator Background="#313244" Margin="0,5"/>
+                    <Border Background="#252525" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Total Loaded" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
+                            <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" FontSize="28" Foreground="{StaticResource TextBrush}" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
                     
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Verified (🟢):"/>
-                        <TextBlock Text="{Binding VerifiedCount}" HorizontalAlignment="Right" Foreground="#a6e3a1" FontWeight="Bold"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Unverified (🟡):"/>
-                        <TextBlock Text="{Binding UnverifiedCount}" HorizontalAlignment="Right" Foreground="#f9e2af" FontWeight="Bold"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Wrong Pass (🔴):"/>
-                        <TextBlock Text="{Binding WrongPassCount}" HorizontalAlignment="Right" Foreground="#f38ba8" FontWeight="Bold"/>
+                    <Grid Margin="0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_CheckCircle}" Fill="{StaticResource SuccessBrush}" Width="16" Height="16" Stretch="Uniform"/>
+                            <TextBlock Text="Verified" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding VerifiedCount}" HorizontalAlignment="Right" Foreground="{StaticResource SuccessBrush}" FontWeight="Bold" FontSize="16"/>
                     </Grid>
                     
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Error (⚪):"/>
-                        <TextBlock Text="{Binding ErrorCount}" HorizontalAlignment="Right" Foreground="#bac2de" FontWeight="Bold"/>
+                    <Grid Margin="0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Warning}" Fill="{StaticResource WarningBrush}" Width="16" Height="16" Stretch="Uniform"/>
+                            <TextBlock Text="Unverified" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding UnverifiedCount}" HorizontalAlignment="Right" Foreground="{StaticResource WarningBrush}" FontWeight="Bold" FontSize="16"/>
                     </Grid>
                     
-                    <Grid Margin="0,5">
-                        <TextBlock Text="Captcha (🟠):"/>
-                        <TextBlock Text="{Binding CaptchaCount}" HorizontalAlignment="Right" Foreground="#fab387" FontWeight="Bold"/>
+                    <Grid Margin="0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Error}" Fill="{StaticResource ErrorBrush}" Width="16" Height="16" Stretch="Uniform"/>
+                            <TextBlock Text="Wrong Pass" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding WrongPassCount}" HorizontalAlignment="Right" Foreground="{StaticResource ErrorBrush}" FontWeight="Bold" FontSize="16"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Stop}" Fill="{StaticResource TextMutedBrush}" Width="14" Height="14" Stretch="Uniform" Margin="1,0,0,0"/>
+                            <TextBlock Text="Error" Margin="9,0,0,0" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding ErrorCount}" HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" FontSize="16"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon_Search}" Fill="#FF9800" Width="16" Height="16" Stretch="Uniform"/>
+                            <TextBlock Text="Captcha" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding CaptchaCount}" HorizontalAlignment="Right" Foreground="#FF9800" FontWeight="Bold" FontSize="16"/>
                     </Grid>
                 </StackPanel>
             </Border>
         </Grid>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBackgroundBrush}" CornerRadius="4" Padding="10,5" Margin="0,10,0,0">
-            <TextBlock Text="{Binding StatusMessage}" FontStyle="Italic"/>
+        <!-- FOOTER STATUS -->
+        <Border Grid.Row="3" Background="#151515" CornerRadius="6" Padding="12,8" Margin="0,15,0,0" BorderBrush="#252525" BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Fill="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, ConverterParameter=running}" Margin="0,0,8,0">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                    <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                </Ellipse>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold"/>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>
