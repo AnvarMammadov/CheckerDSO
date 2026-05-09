@@ -25,6 +25,7 @@ namespace CheckerDSO.ViewModels
         private int _errorCount;
         private int _captchaCount;
         private int _threadCount = 5;
+        private string _twoCaptchaApiKey = "";
         
         private bool _isRunning;
         private string _statusMessage = "Ready";
@@ -82,6 +83,12 @@ namespace CheckerDSO.ViewModels
         public int ErrorCount { get => _errorCount; set => SetProperty(ref _errorCount, value); }
         public int CaptchaCount { get => _captchaCount; set => SetProperty(ref _captchaCount, value); }
 
+        public string TwoCaptchaApiKey
+        {
+            get => _twoCaptchaApiKey;
+            set => SetProperty(ref _twoCaptchaApiKey, value);
+        }
+
         #endregion
 
         #region Commands
@@ -95,17 +102,52 @@ namespace CheckerDSO.ViewModels
         private bool CanExecuteLoadLogs(object obj) => !IsRunning;
         private void ExecuteLoadLogs(object obj)
         {
-            var dialog = new OpenFileDialog { Filter = "Text Files|*.txt", Title = "Select Combos (email:pass)" };
+            var dialog = new OpenFileDialog { Filter = "Text Files|*.txt", Title = "Select Combos (user:pass)" };
             if (dialog.ShowDialog() == true)
             {
                 var lines = File.ReadAllLines(dialog.FileName);
                 Accounts.Clear();
                 foreach (var line in lines)
                 {
-                    var parts = line.Split(':');
-                    if (parts.Length >= 2)
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    
+                    string user = null;
+                    string pass = null;
+
+                    // Support format: url|user|pass
+                    if (line.Contains("|"))
                     {
-                        var entry = new AccountEntry { Email = parts[0].Trim(), Password = parts[1].Trim(), Status = AccountStatus.Pending };
+                        var parts = line.Split('|');
+                        if (parts.Length >= 4)
+                        {
+                            user = parts[parts.Length - 3].Trim();
+                            pass = parts[parts.Length - 2].Trim();
+                        }
+                    }
+                    // Support format: id;user;pass
+                    else if (line.Contains(";"))
+                    {
+                        var parts = line.Split(';');
+                        if (parts.Length >= 3)
+                        {
+                            user = parts[1].Trim();
+                            pass = parts[2].Trim();
+                        }
+                    }
+                    // Support standard format: user:pass (and handle extra garbage before user)
+                    else if (line.Contains(":"))
+                    {
+                        var parts = line.Split(':');
+                        if (parts.Length >= 2)
+                        {
+                            user = parts[parts.Length - 2].Split(' ').Last().Trim();
+                            pass = parts[parts.Length - 1].Trim();
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(pass))
+                    {
+                        var entry = new AccountEntry { Email = user, Password = pass, Status = AccountStatus.Pending };
                         entry.PropertyChanged += Entry_PropertyChanged;
                         Accounts.Add(new AccountRowViewModel(entry));
                     }
@@ -146,7 +188,7 @@ namespace CheckerDSO.ViewModels
             StatusMessage = "Checking...";
             _cts = new CancellationTokenSource();
 
-            var checker = new CheckerService(_proxies);
+            var checker = new CheckerService(_proxies) { TwoCaptchaApiKey = TwoCaptchaApiKey };
             var pendingAccounts = Accounts.Select(a => a.Account).ToList();
 
             var progress = new Progress<int>(_ => UpdateStats());

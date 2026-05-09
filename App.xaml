@@ -75,7 +75,10 @@
                                     </Setter>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="border" Property="Opacity" Value="0.4"/>
+                                    <Setter TargetName="border" Property="Background" Value="#1A1A1A"/>
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#222222"/>
+                                    <Setter Property="Foreground" Value="#444444"/>
+                                    <Setter TargetName="border" Property="Opacity" Value="1"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
