@@ -3,14 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:CheckerDSO.Views"
         xmlns:vm="clr-namespace:CheckerDSO.ViewModels"
         xmlns:conv="clr-namespace:CheckerDSO.Converters"
         mc:Ignorable="d"
-        Title="DSO Account Checker" Height="700" Width="1000"
+        Title="DSO Account Checker" Height="760" Width="1080"
         Background="{StaticResource WindowBgBrush}"
-        WindowStartupLocation="CenterScreen">
-    
+        WindowStartupLocation="CenterScreen"
+        MinWidth="900" MinHeight="600">
+
     <Window.DataContext>
         <vm:MainViewModel/>
     </Window.DataContext>
@@ -18,8 +18,7 @@
     <Window.Resources>
         <conv:StatusToColorConverter x:Key="StatusColorConverter"/>
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
-        
-        <!-- CARD STYLE FOR PANELS -->
+
         <Style x:Key="CardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="CornerRadius" Value="8"/>
@@ -31,108 +30,155 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Expander Style -->
+        <Style x:Key="ConfigExpander" TargetType="Expander">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <StackPanel>
+                            <ToggleButton x:Name="HeaderSite"
+                                          IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          Background="Transparent" BorderThickness="0"
+                                          Padding="0" HorizontalContentAlignment="Stretch"
+                                          Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="#1E1E1E" CornerRadius="6" Padding="10,8" Cursor="Hand">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#252525"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <ContentPresenter/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ContentPresenter ContentSource="Header"/>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Stat Row Style -->
+        <Style x:Key="StatRow" TargetType="Border">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="15">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Toolbar -->
-            <RowDefinition Height="*"/>    <!-- Main Content -->
-            <RowDefinition Height="Auto"/> <!-- Footer Status -->
+            <RowDefinition Height="Auto"/>  <!-- Header -->
+            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
+            <RowDefinition Height="*"/>     <!-- Main Content -->
+            <RowDefinition Height="Auto"/>  <!-- Footer -->
         </Grid.RowDefinitions>
 
-        <!-- HEADER -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15" VerticalAlignment="Center">
-            <Path Data="{StaticResource Icon_Shield}" Fill="{StaticResource PrimaryBrush}" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
-            <TextBlock Text="DSO" FontWeight="Bold" FontSize="22" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-            <TextBlock Text=" Account Checker" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
-            <Border Background="#252525" CornerRadius="4" Padding="5,2" Margin="10,0,0,0">
-                <TextBlock Text="v1.0" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+        <!-- ═══ HEADER ═══ -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+            <Path Data="{StaticResource Icon_Shield}" Fill="{StaticResource PrimaryBrush}" Width="26" Height="26" Stretch="Uniform" Margin="0,0,10,0"/>
+            <TextBlock Text="DSO" FontWeight="Bold" FontSize="21" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text=" Account Checker" FontWeight="SemiBold" FontSize="21" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+            <Border Background="#252525" CornerRadius="4" Padding="5,2" Margin="8,0,0,0">
+                <TextBlock Text="v1.0" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
             </Border>
         </StackPanel>
 
-        <!-- TOOLBAR -->
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10" Margin="0,0,0,15">
+        <!-- ═══ TOOLBAR ═══ -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Load Logs -->
                     <Button Command="{Binding LoadLogsCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Folder}" Fill="{StaticResource TextBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <Path Data="{StaticResource Icon_Folder}" Fill="{StaticResource TextBrush}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,7,0"/>
                             <TextBlock Text="Load Logs" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    
-                    <!-- Load Proxies -->
+
                     <Button Command="{Binding LoadProxiesCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Globe}" Fill="{StaticResource TextBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <Path Data="{StaticResource Icon_Globe}" Fill="{StaticResource TextBrush}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,7,0"/>
                             <TextBlock Text="Load Proxies" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
 
-                    <!-- Start -->
-                    <Button Command="{Binding StartCommand}" Style="{StaticResource SuccessButtonStyle}" Margin="15,4,4,4">
+                    <Button Command="{Binding StartCommand}" Style="{StaticResource SuccessButtonStyle}" Margin="12,4,4,4">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Play}" Fill="{StaticResource WindowBgBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,6,0"/>
+                            <Path Data="{StaticResource Icon_Play}" Fill="{StaticResource WindowBgBrush}" Width="13" Height="13" Stretch="Uniform" Margin="0,0,6,0"/>
                             <TextBlock Text="START" FontWeight="Bold"/>
                         </StackPanel>
                     </Button>
 
-                    <!-- Stop -->
                     <Button Command="{Binding StopCommand}" Style="{StaticResource ErrorButtonStyle}">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Stop}" Fill="{StaticResource WindowBgBrush}" Width="12" Height="12" Stretch="Uniform" Margin="0,0,6,0"/>
+                            <Path Data="{StaticResource Icon_Stop}" Fill="{StaticResource WindowBgBrush}" Width="11" Height="11" Stretch="Uniform" Margin="0,0,5,0"/>
                             <TextBlock Text="STOP" FontWeight="Bold"/>
                         </StackPanel>
                     </Button>
 
-                    <!-- Export Unverified -->
-                    <Button Command="{Binding ExportUnverifiedCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="15,4,4,4">
+                    <Button Command="{Binding ExportUnverifiedCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="12,4,4,4">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Export}" Fill="{StaticResource WindowBgBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                            <Path Data="{StaticResource Icon_Export}" Fill="{StaticResource WindowBgBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"/>
                             <TextBlock Text="Export Unverified" FontWeight="Bold"/>
                         </StackPanel>
                     </Button>
                 </WrapPanel>
 
-                <!-- Thread Slider -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,5,0">
-                    <Path Data="{StaticResource Icon_Search}" Fill="{StaticResource TextMutedBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,5,0"/>
-                    <TextBlock Text="Threads:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,5,0" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding ThreadCount}" Width="20" FontWeight="Bold"/>
-                    <Slider Minimum="1" Maximum="50" Value="{Binding ThreadCount}" Width="100" Margin="5,0,0,0" 
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,4,0">
+                    <TextBlock Text="Threads:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,5,0" FontWeight="SemiBold" FontSize="12"/>
+                    <TextBlock Text="{Binding ThreadCount}" Width="22" FontWeight="Bold" FontSize="12"/>
+                    <Slider Minimum="1" Maximum="50" Value="{Binding ThreadCount}" Width="90" Margin="4,0,0,0"
                             IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- MAIN CONTENT (DataGrid + Stats) -->
+        <!-- ═══ MAIN CONTENT ═══ -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*"/>
-                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <!-- DataGrid Wrapper -->
-            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,15,0" Padding="1">
-                <DataGrid ItemsSource="{Binding Accounts}" AutoGenerateColumns="False" 
-                          CanUserAddRows="False" IsReadOnly="True" 
+            <!-- DataGrid -->
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,12,0" Padding="1">
+                <DataGrid ItemsSource="{Binding Accounts}" AutoGenerateColumns="False"
+                          CanUserAddRows="False" IsReadOnly="True"
                           BorderThickness="0" Background="Transparent"
                           VirtualizingStackPanel.IsVirtualizing="True">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="1.5*"/>
                         <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="1*"/>
-                        <DataGridTemplateColumn Header="Status" Width="1*">
+                        <DataGridTemplateColumn Header="Status" Width="90">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Border Background="#151515" CornerRadius="4" Padding="8,4" HorizontalAlignment="Left">
-                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" 
+                                    <Border Background="#151515" CornerRadius="4" Padding="7,3" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" FontSize="12"
                                                    Foreground="{Binding Status, Converter={StaticResource StatusColorConverter}}"/>
                                     </Border>
                                 </DataTemplate>
@@ -143,96 +189,180 @@
                 </DataGrid>
             </Border>
 
-            <!-- Stats Dashboard -->
-            <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="20">
-                <StackPanel>
-                    <TextBlock Text="DASHBOARD" FontWeight="Bold" FontSize="16" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,20"/>
-                    
-                    <Border Background="#252525" CornerRadius="6" Padding="15" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Text="Total Loaded" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
-                            <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" FontSize="28" Foreground="{StaticResource TextBrush}" Margin="0,5,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    
-                    <Grid Margin="0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_CheckCircle}" Fill="{StaticResource SuccessBrush}" Width="16" Height="16" Stretch="Uniform"/>
-                            <TextBlock Text="Verified" Margin="8,0,0,0" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding VerifiedCount}" HorizontalAlignment="Right" Foreground="{StaticResource SuccessBrush}" FontWeight="Bold" FontSize="16"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Warning}" Fill="{StaticResource WarningBrush}" Width="16" Height="16" Stretch="Uniform"/>
-                            <TextBlock Text="Unverified" Margin="8,0,0,0" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding UnverifiedCount}" HorizontalAlignment="Right" Foreground="{StaticResource WarningBrush}" FontWeight="Bold" FontSize="16"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Error}" Fill="{StaticResource ErrorBrush}" Width="16" Height="16" Stretch="Uniform"/>
-                            <TextBlock Text="Wrong Pass" Margin="8,0,0,0" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding WrongPassCount}" HorizontalAlignment="Right" Foreground="{StaticResource ErrorBrush}" FontWeight="Bold" FontSize="16"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Stop}" Fill="{StaticResource TextMutedBrush}" Width="14" Height="14" Stretch="Uniform" Margin="1,0,0,0"/>
-                            <TextBlock Text="Error" Margin="9,0,0,0" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding ErrorCount}" HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" FontSize="16"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon_Search}" Fill="#FF9800" Width="16" Height="16" Stretch="Uniform"/>
-                            <TextBlock Text="Captcha" Margin="8,0,0,0" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding CaptchaCount}" HorizontalAlignment="Right" Foreground="#FF9800" FontWeight="Bold" FontSize="16"/>
-                    </Grid>
+            <!-- ═══ RIGHT SIDEBAR ═══ -->
+            <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="16">
 
-                    <!-- 2Captcha API Key -->
-                    <Border Background="#1A1A2E" CornerRadius="6" Padding="12" Margin="0,15,0,0" BorderBrush="#7C3AED" BorderThickness="1">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="🔑" FontSize="12" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="2captcha API Key" Foreground="#A78BFA" FontSize="11" FontWeight="SemiBold"/>
-                            </StackPanel>
-                            <TextBox Text="{Binding TwoCaptchaApiKey, UpdateSourceTrigger=PropertyChanged}"
-                                     Background="#0D0D1A" Foreground="#E2E8F0"
-                                     BorderBrush="#7C3AED" BorderThickness="1"
-                                     Padding="8,6" FontSize="11" FontFamily="Consolas"
-                                     ToolTip="2captcha.com'dan API key alın (hCaptcha çözümü için gerekli)"
-                                     IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
-                            <TextBlock Text="https://2captcha.com" Foreground="#6D28D9" FontSize="10" 
-                                       Margin="0,4,0,0" Cursor="Hand"
-                                       ToolTip="API key almak için ziyaret edin"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                        <!-- DASHBOARD TITLE -->
+                        <TextBlock Text="DASHBOARD" FontWeight="Bold" FontSize="13"
+                                   Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+
+                        <!-- Total -->
+                        <Border Background="#252525" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                            <Grid>
+                                <TextBlock Text="Total Loaded" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding TotalCount}" HorizontalAlignment="Right"
+                                           FontWeight="Bold" FontSize="22" Foreground="{StaticResource TextBrush}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Stats Grid (2x3 compact) -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Verified -->
+                            <Border Grid.Column="0" Grid.Row="0" Background="#0D1F0D" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="✔ Verified" Foreground="#4ADE80" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding VerifiedCount}" Foreground="#4ADE80" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Unverified -->
+                            <Border Grid.Column="2" Grid.Row="0" Background="#1F1700" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="⚠ Unverified" Foreground="#FBBF24" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding UnverifiedCount}" Foreground="#FBBF24" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Wrong Pass -->
+                            <Border Grid.Column="0" Grid.Row="2" Background="#1F0D0D" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="✗ Wrong Pass" Foreground="#F87171" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding WrongPassCount}" Foreground="#F87171" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Captcha -->
+                            <Border Grid.Column="2" Grid.Row="2" Background="#1F1100" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="◉ Captcha" Foreground="#FB923C" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding CaptchaCount}" Foreground="#FB923C" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Error -->
+                            <Border Grid.Column="0" Grid.Row="4" Background="#151515" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="⚡ Error" Foreground="{StaticResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding ErrorCount}" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Checking (placeholder) -->
+                            <Border Grid.Column="2" Grid.Row="4" Background="#151515" CornerRadius="6" Padding="10,8">
+                                <StackPanel>
+                                    <TextBlock Text="⟳ Checking" Foreground="#64748B" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding TotalCount}" Foreground="#64748B" FontWeight="Bold" FontSize="20" Margin="0,2,0,0" Visibility="Hidden"/>
+                                    <TextBlock Text="—" Foreground="#64748B" FontWeight="Bold" FontSize="20" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Separator -->
+                        <Border Height="1" Background="#252525" Margin="0,14,0,10"/>
+
+                        <!-- ═══ CAPTCHA API KEY EXPANDER ═══ -->
+                        <Expander Style="{StaticResource ConfigExpander}" IsExpanded="True">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🔑" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Captcha API Key" Foreground="#A78BFA" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <Border Background="#13131F" CornerRadius="0,0,6,6" Padding="10,10,10,10" BorderBrush="#2D1B69" BorderThickness="1,0,1,1">
+                                <StackPanel>
+                                    <TextBox Text="{Binding TwoCaptchaApiKey, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="#0D0D1A" Foreground="#E2E8F0"
+                                             BorderBrush="#7C3AED" BorderThickness="1"
+                                             Padding="8,6" FontSize="11" FontFamily="Consolas"
+                                             ToolTip="2captcha veya CapSolver API key"
+                                             IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <TextBlock Foreground="#6D28D9" FontSize="10" Margin="0,0,8,0">
+                                            <Hyperlink NavigateUri="https://2captcha.com">2captcha.com</Hyperlink>
+                                        </TextBlock>
+                                        <TextBlock Text="·" Foreground="#333" FontSize="10" Margin="0,0,8,0"/>
+                                        <TextBlock Foreground="#7C3AED" FontSize="10">
+                                            <Hyperlink NavigateUri="https://capsolver.com">CapSolver</Hyperlink>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <TextBlock Text="CapSolver key: CAP-xxxx... formatında" Foreground="#4B4B6A" FontSize="9" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Expander>
+
+                        <!-- ═══ BRIGHTDATA EXPANDER ═══ -->
+                        <Expander Style="{StaticResource ConfigExpander}" IsExpanded="False" Margin="0,6,0,0">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🌐" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="BrightData" Foreground="#2DD4BF" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
+                                    <Border Background="#134E4A" CornerRadius="3" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Captcha bypass" Foreground="#5EEAD4" FontSize="9"/>
+                                    </Border>
+                                </StackPanel>
+                            </Expander.Header>
+                            <Border Background="#0A1412" CornerRadius="0,0,6,6" Padding="10,10,10,10" BorderBrush="#134E4A" BorderThickness="1,0,1,1">
+                                <StackPanel>
+                                    <TextBlock TextWrapping="Wrap" FontSize="9" Foreground="#5EEAD4" Margin="0,0,0,8">
+                                        Dashboard → "Native proxy-based access" tab'ından username ve password al.
+                                    </TextBlock>
+                                    <TextBlock Text="Username" Foreground="#64748B" FontSize="10" Margin="0,0,0,3"/>
+                                    <TextBox Text="{Binding BrightDataUsername, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="#061010" Foreground="#E2E8F0"
+                                             BorderBrush="#0D9488" BorderThickness="1"
+                                             Padding="8,5" FontSize="10" FontFamily="Consolas"
+                                             ToolTip="brd-customer-hl_...-zone-xml_unlocker"
+                                             IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
+                                    <TextBlock Text="Password" Foreground="#64748B" FontSize="10" Margin="0,6,0,3"/>
+                                    <PasswordBox x:Name="BrightDataPasswordBox"
+                                                 Background="#061010" Foreground="#E2E8F0"
+                                                 BorderBrush="#0D9488" BorderThickness="1"
+                                                 Padding="8,5" FontSize="11"
+                                                 IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"/>
+                                    <TextBlock Foreground="#0D9488" FontSize="9" Margin="0,6,0,0">
+                                        <Hyperlink NavigateUri="https://brightdata.com">brightdata.com</Hyperlink>
+                                        <Run Text=" — $7 ücretsiz kredi"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </Expander>
+
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
 
-        <!-- FOOTER STATUS -->
-        <Border Grid.Row="3" Background="#151515" CornerRadius="6" Padding="12,8" Margin="0,15,0,0" BorderBrush="#252525" BorderThickness="1">
+        <!-- ═══ FOOTER ═══ -->
+        <Border Grid.Row="3" Background="#151515" CornerRadius="6" Padding="12,7" Margin="0,10,0,0" BorderBrush="#252525" BorderThickness="1">
             <StackPanel Orientation="Horizontal">
-                <Ellipse Width="8" Height="8" Fill="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}, ConverterParameter=running}" Margin="0,0,8,0">
+                <Ellipse Width="7" Height="7" Margin="0,0,8,0">
                     <Ellipse.Style>
                         <Style TargetType="Ellipse">
-                            <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
+                            <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsRunning}" Value="False">
-                                    <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
+                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                    <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Ellipse.Style>
                 </Ellipse>
-                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12"/>
             </StackPanel>
         </Border>
     </Grid>

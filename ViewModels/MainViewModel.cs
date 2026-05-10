@@ -26,6 +26,8 @@ namespace CheckerDSO.ViewModels
         private int _captchaCount;
         private int _threadCount = 5;
         private string _twoCaptchaApiKey = "";
+        private string _brightDataUsername = "";
+        private string _brightDataPassword = "";
         
         private bool _isRunning;
         private string _statusMessage = "Ready";
@@ -87,6 +89,18 @@ namespace CheckerDSO.ViewModels
         {
             get => _twoCaptchaApiKey;
             set => SetProperty(ref _twoCaptchaApiKey, value);
+        }
+
+        public string BrightDataUsername
+        {
+            get => _brightDataUsername;
+            set => SetProperty(ref _brightDataUsername, value);
+        }
+
+        public string BrightDataPassword
+        {
+            get => _brightDataPassword;
+            set => SetProperty(ref _brightDataPassword, value);
         }
 
         #endregion
@@ -188,7 +202,25 @@ namespace CheckerDSO.ViewModels
             StatusMessage = "Checking...";
             _cts = new CancellationTokenSource();
 
-            var checker = new CheckerService(_proxies) { TwoCaptchaApiKey = TwoCaptchaApiKey };
+            // Debug log fayla yaz — proqramın yanında debug_log.txt yaranır
+            string debugLogPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "debug_log.txt");
+            File.WriteAllText(debugLogPath, $"=== DSO Checker Debug Log — {DateTime.Now} ===\n");
+
+            var checker = new CheckerService(_proxies)
+            {
+                TwoCaptchaApiKey = TwoCaptchaApiKey,
+                BrightDataUsername = BrightDataUsername,
+                BrightDataPassword = BrightDataPassword
+            };
+
+            // Verbose logları fayla yaz
+            checker.OnDebugLog += msg =>
+            {
+                try { File.AppendAllText(debugLogPath, msg + "\n"); }
+                catch { /* ignore IO errors */ }
+            };
+
             var pendingAccounts = Accounts.Select(a => a.Account).ToList();
 
             var progress = new Progress<int>(_ => UpdateStats());
