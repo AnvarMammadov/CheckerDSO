@@ -508,7 +508,7 @@
                           VirtualizingStackPanel.VirtualizationMode="Recycling">
                     <DataGrid.Columns>
 
-                        <DataGridTextColumn Header="EMAIL" Width="2.2*" Binding="{Binding Email}">
+                        <DataGridTextColumn Header="USERNAME" Width="2.2*" Binding="{Binding Email}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
